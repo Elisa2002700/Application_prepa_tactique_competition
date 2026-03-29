@@ -4,4 +4,3 @@ numpy
 plotly
 statsmodels
 openpyxl
-pillow>=10.4.0
