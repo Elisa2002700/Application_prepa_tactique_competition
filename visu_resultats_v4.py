@@ -3,14 +3,6 @@
 # VERSION COMPLÈTE CORRIGÉE
 # ============================================================
 
-# --- AUTO-LAUNCH STREAMLIT (robuste, gère accents/espaces) ---
-import os, sys, subprocess, pathlib
-if __name__ == "__main__" and os.environ.get("STREAMLIT_RUNNING") != "1":
-    os.environ["STREAMLIT_RUNNING"] = "1"
-    script_path = str(pathlib.Path(__file__).resolve())
-    subprocess.run([sys.executable, "-m", "streamlit", "run", script_path] + sys.argv[1:])
-    sys.exit()
-
 # ---------------------------
 # IMPORTS
 # ---------------------------
@@ -257,8 +249,15 @@ tr:nth-child(even) {{ background-color: #fafafa; }}
 def load_data(path):
     return pd.read_excel(path, engine="openpyxl")
 
-FILE_PATH = '/Users/elisagault/Desktop/Pôle haltéro/Applis/Résultats inter/all_results_clean_harmonized_fin.xlsx'
-df = load_data(FILE_PATH)
+DEFAULT_FILE = "data/all_results_clean_harmonized_fin.xlsx"
+uploaded_file = st.file_uploader(
+    "Importer un fichier Excel (optionnel)",
+    type=["xlsx"]
+)
+
+file_to_load = uploaded_file if uploaded_file else DEFAULT_FILE
+
+df = load_data(file_to_load)
 
 # ---------------------------
 # CLEAN SOURCE
