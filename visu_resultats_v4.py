@@ -1,7 +1,3 @@
-# ============================================================
-# APP Streamlit — Extraction/traitement = v3, Visualisations = v2
-# VERSION COMPLÈTE CORRIGÉE
-# ============================================================
 
 # ---------------------------
 # IMPORTS
@@ -1176,18 +1172,57 @@ if page == "Athlètes internationaux":
             return np.nan
 
     def compute_bulles(dfX, cols_raw, lift_name):
+
         results = []
+
         for _, row in dfX.iterrows():
+
+            # récupérer les essais
             raws = [row[c] for c in cols_raw if c in dfX.columns]
-            if len(raws) == 3 and all(is_miss(r) for r in raws):
-                weights = [extract_weight_raw(r) for r in raws]
-                if len(set(weights)) == 1:
-                    results.append(weights[0])
+
+            # garder uniquement les essais existants
+            raws = [r for r in raws if not pd.isna(r)]
+
+            # condition bulle : 3 essais ratés
+            if len(raws) > 0 and all(is_miss(r) for r in raws):
+
+                weights = [
+                    extract_weight_raw(r)
+                    for r in raws
+                ]
+
+                # PREMIÈRE charge ratée (pas min)
+                charge_bulle = weights[0]
+
+                # récupérer infos ligne
+                date_value = row.get("Date_extrait", None)
+                competition_value = row.get("Competition", None)
+
+                results.append({
+                    "Date": date_value,
+                    "Compétition": competition_value,
+                    "Mouvement": lift_name,
+                    "Charge": charge_bulle
+                })
+
         if len(results) == 0:
-            return pd.DataFrame(columns=["Charge", "Nombre de bulles", "Mouvement"])
-        df_res = pd.DataFrame(results, columns=["Charge"])
-        df_res = df_res.value_counts().reset_index(name="Nombre de bulles")
-        df_res["Mouvement"] = lift_name
+            return pd.DataFrame(
+                columns=[
+                    "Date",
+                    "Compétition",
+                    "Mouvement",
+                    "Charge"
+                ]
+            )
+
+        df_res = pd.DataFrame(results)
+
+        # tri chronologique décroissant
+        df_res = df_res.sort_values(
+            by="Date",
+            ascending=False
+        )
+
         return df_res
 
     bulles_snatch = compute_bulles(df_athlete_all, ['1_raw','2_raw','3_raw'], "Arraché")
@@ -1197,7 +1232,7 @@ if page == "Athlètes internationaux":
     if df_bulles.empty:
         st.info("Aucune bulle détectée.")
     else:
-        df_bulles = df_bulles.sort_values(by="Nombre de bulles", ascending=False)
+        df_bulles["Date"] = df_bulles["Date"].dt.strftime("%Y-%m-%d")
         st.dataframe(df_bulles, use_container_width=True)
 
     # ======================================================
