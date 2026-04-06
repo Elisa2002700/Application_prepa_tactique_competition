@@ -1,4 +1,4 @@
-#-------------------------
+# ---------------------------
 # IMPORTS
 # ---------------------------
 import streamlit as st
@@ -94,6 +94,7 @@ def summary_to_html(df):
         "Meilleur total", "Meilleur arraché", "Meilleur épaulé-jeté",
         "Meilleure barre départ arraché", "Meilleure barre départ épaulé-jeté",
         "P.C. au meilleur total"
+        # "Date au meilleur total" et "Compétition au meilleur total" sont des strings, pas besoin de format float
     ]
     rows_html = ""
     for i, (_, row) in enumerate(df.iterrows()):
@@ -1643,6 +1644,8 @@ if page == "Athlètes internationaux":
                     "Meilleure barre départ arraché": best_start_snatch,
                     "Meilleure barre départ épaulé-jeté": best_start_cj,
                     "P.C. au meilleur total": bodyweight_best_total,
+                    "Date au meilleur total": row_best_total.get('Date_extrait', pd.NaT) if df_a['Total'].notna().any() else pd.NaT,
+                    "Compétition au meilleur total": row_best_total.get('Competition', '') if df_a['Total'].notna().any() else '',
                 })
 
         # ---- Plage personnalisée (hors boucle) ----
@@ -1706,14 +1709,19 @@ if page == "Athlètes internationaux":
                             "Meilleure barre départ arraché": best_start_snatch,
                             "Meilleure barre départ épaulé-jeté": best_start_cj,
                             "P.C. au meilleur total": bodyweight_best_total,
+                            "Date au meilleur total": row_best_total.get('Date_extrait', pd.NaT) if df_a['Total'].notna().any() else pd.NaT,
+                            "Compétition au meilleur total": row_best_total.get('Competition', '') if df_a['Total'].notna().any() else '',
                         })
 
         summary_df = pd.DataFrame(summary_list)
 
         if not summary_df.empty:
             summary_df = summary_df.sort_values(by="Meilleur total", ascending=False)
+            summary_df_display = summary_df.copy()
+            summary_df_display["Date au meilleur total"] = pd.to_datetime(summary_df_display["Date au meilleur total"]).dt.strftime("%Y-%m-%d")
+
             st.dataframe(
-                summary_df.style.format({
+                summary_df_display.style.format({
                     "Meilleur total": "{:.1f}",
                     "Meilleur arraché": "{:.1f}",
                     "Meilleur épaulé-jeté": "{:.1f}",
