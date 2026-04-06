@@ -1,5 +1,4 @@
-
-# ---------------------------
+-------------------------
 # IMPORTS
 # ---------------------------
 import streamlit as st
@@ -464,6 +463,10 @@ except Exception:
 
 page = st.sidebar.radio("Navigation", ["Athlètes internationaux"])
 
+# ── Bouton rapport dans la sidebar ──
+st.sidebar.divider()
+generate_report_clicked = st.sidebar.button("📄 Générer le rapport HTML global")
+
 if page == "Athlètes internationaux":
     st.title("Évolution des Performances")
 
@@ -523,7 +526,7 @@ if page == "Athlètes internationaux":
 
     # --------- Filtres catégories ----------
     st.header("Évolution des performances")
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
     with col1:
         poids_categories = sorted(df_athlete['Categorie_poids'].dropna().astype(str).unique())
         selected_weight_category = st.multiselect(
@@ -534,6 +537,18 @@ if page == "Athlètes internationaux":
     with col2:
         age_categories = ['Tous'] + sorted(df_athlete['Categorie_age'].dropna().astype(str).unique())
         selected_age_category = st.selectbox("Catégorie d'âge", age_categories)
+    with col3:
+        period_options = [
+            "Auto",
+            "6 derniers mois",
+            "1 an",
+            "2 ans",
+            "3 ans",
+            "5 ans",
+            "Plage personnalisée",
+            "Tout"
+        ]
+        selected_period = st.selectbox("Choisir une période", period_options)
 
     filtered_df = df_athlete.copy()
     if selected_weight_category:
@@ -545,6 +560,56 @@ if page == "Athlètes internationaux":
         st.warning("Aucune donnée pour ces filtres.")
         st.stop()
 
+    # ======================================================
+    # FILTRE TEMPOREL GLOBAL
+    # ======================================================
+
+    min_date = filtered_df["Date_extrait"].min()
+    max_date = filtered_df["Date_extrait"].max()
+
+    def compute_start_date(period, max_date, min_date):
+        if period == "6 derniers mois":
+            return max_date - pd.DateOffset(months=6)
+        elif period == "1 an":
+            return max_date - pd.DateOffset(years=1)
+        elif period == "2 ans":
+            return max_date - pd.DateOffset(years=2)
+        elif period == "3 ans":
+            return max_date - pd.DateOffset(years=3)
+        elif period == "5 ans":
+            return max_date - pd.DateOffset(years=5)
+        elif period == "Auto":
+            return max_date - pd.DateOffset(years=2)
+        elif period == "Tout":
+            return min_date
+        return min_date
+
+    # ---- CAS plage personnalisée ----
+    if selected_period == "Plage personnalisée":
+        col_start, col_end, _ = st.columns(3)
+        with col_start:
+            custom_start_date = st.date_input(
+                "Date début",
+                value=min_date.date(),
+                min_value=min_date.date(),
+                max_value=max_date.date()
+            )
+        with col_end:
+            custom_end_date = st.date_input(
+                "Date fin",
+                value=max_date.date(),
+                min_value=min_date.date(),
+                max_value=max_date.date()
+            )
+        filtered_df = filtered_df[
+            (filtered_df["Date_extrait"] >= pd.Timestamp(custom_start_date))
+            & (filtered_df["Date_extrait"] <= pd.Timestamp(custom_end_date))
+        ]
+    else:
+        start_date = compute_start_date(selected_period, max_date, min_date)
+        filtered_df = filtered_df[
+            filtered_df["Date_extrait"] >= start_date
+        ]
     # --------- Graphique performance ----------
     color_list = [
         'rgba(255, 0, 0, 0.2)',
@@ -681,10 +746,72 @@ if page == "Athlètes internationaux":
 
     # ======================================================
     # Changements de charge par essai (2 dernières années)
-    # ======================================================
-    st.header("Changements de charge par essai (2 dernières années)")
+
+    st.header("Changements de charge par essai")
 
     df_athlete_raw = df_athlete_all.copy()
+
+    # ---- Filtres ----
+    col_ch1, col_ch2, col_ch3 = st.columns(3)
+    with col_ch1:
+        poids_categories_ch = sorted(df_athlete_raw['Categorie_poids'].dropna().astype(str).unique())
+        selected_weight_ch = st.multiselect(
+            "Catégorie de poids",
+            poids_categories_ch,
+            default=poids_categories_ch,
+            key="weight_changes"
+        )
+    with col_ch2:
+        age_categories_ch = ['Tous'] + sorted(df_athlete_raw['Categorie_age'].dropna().astype(str).unique())
+        selected_age_ch = st.selectbox("Catégorie d'âge", age_categories_ch, key="age_changes")
+    with col_ch3:
+        period_options_ch = [
+            "Auto",
+            "6 derniers mois",
+            "1 an",
+            "2 ans",
+            "3 ans",
+            "5 ans",
+            "Plage personnalisée",
+            "Tout"
+        ]
+        selected_period_ch = st.selectbox("Choisir une période", period_options_ch, key="period_changes")
+
+    if selected_weight_ch:
+        df_athlete_raw = df_athlete_raw[df_athlete_raw['Categorie_poids'].isin(selected_weight_ch)]
+    if selected_age_ch != 'Tous':
+        df_athlete_raw = df_athlete_raw[df_athlete_raw['Categorie_age'] == selected_age_ch]
+
+    min_date_ch = df_athlete_raw["Date_extrait"].min()
+    max_date_ch = df_athlete_raw["Date_extrait"].max()
+
+    if selected_period_ch == "Plage personnalisée":
+        col_start_ch, col_end_ch, _ = st.columns(3)
+        with col_start_ch:
+            custom_start_ch = st.date_input(
+                "Date début",
+                value=min_date_ch.date(),
+                min_value=min_date_ch.date(),
+                max_value=max_date_ch.date(),
+                key="start_changes"
+            )
+        with col_end_ch:
+            custom_end_ch = st.date_input(
+                "Date fin",
+                value=max_date_ch.date(),
+                min_value=min_date_ch.date(),
+                max_value=max_date_ch.date(),
+                key="end_changes"
+            )
+        df_2y = df_athlete_raw[
+            (df_athlete_raw["Date_extrait"] >= pd.Timestamp(custom_start_ch))
+            & (df_athlete_raw["Date_extrait"] <= pd.Timestamp(custom_end_ch))
+        ].copy()
+    else:
+        start_date_ch = compute_start_date(selected_period_ch, max_date_ch, min_date_ch)
+        df_2y = df_athlete_raw[
+            df_athlete_raw["Date_extrait"] >= start_date_ch
+        ].copy()
     if 'Date_extrait' in df_athlete_raw and not df_athlete_raw['Date_extrait'].isna().all():
         last_date = df_athlete_raw["Date_extrait"].max()
         if pd.notna(last_date):
@@ -900,17 +1027,30 @@ if page == "Athlètes internationaux":
         grp['Taux_total'] = ((grp['ar_done'] + grp['cj_done']) / 6.0).clip(upper=1.0) * 100.0
         return grp[['Date_extrait', 'Competition', 'Categorie_poids', 'Taux_arraché', 'Taux_epj', 'Taux_total']]
 
-    rates_all = compute_success_rates(df_athlete_raw) if not df_athlete_raw.empty else pd.DataFrame(
+    rates_all = compute_success_rates(df_athlete_all) if not df_athlete_all.empty else pd.DataFrame(
         columns=['Date_extrait','Competition','Categorie_poids','Taux_arraché','Taux_epj','Taux_total']
     )
 
-    col3, col4 = st.columns(2)
-    with col3:
+    # ---- Filtres ----
+    col_tx1, col_tx2, col_tx3 = st.columns(3)
+    with col_tx1:
         weight_categories_taux = ['Tous'] + sorted(df_athlete['Categorie_poids'].dropna().astype(str).unique())
-        selected_weight_category_taux = st.selectbox("Catégorie de poids pour les taux", weight_categories_taux, index=0)
-    with col4:
+        selected_weight_category_taux = st.selectbox("Catégorie de poids pour les taux", weight_categories_taux, index=0, key="weight_taux")
+    with col_tx2:
         age_categories_taux = ['Tous'] + sorted(df_athlete['Categorie_age'].dropna().astype(str).unique())
-        selected_age_category_taux = st.selectbox("Catégorie d'âge pour les taux", age_categories_taux, index=0)
+        selected_age_category_taux = st.selectbox("Catégorie d'âge pour les taux", age_categories_taux, index=0, key="age_taux")
+    with col_tx3:
+        period_options_taux = [
+            "Auto",
+            "6 derniers mois",
+            "1 an",
+            "2 ans",
+            "3 ans",
+            "5 ans",
+            "Plage personnalisée",
+            "Tout"
+        ]
+        selected_period_taux = st.selectbox("Choisir une période", period_options_taux, key="period_taux")
 
     rates = rates_all.merge(
         df_athlete[['Date_extrait','Competition','Categorie_age','Categorie_poids']].drop_duplicates(),
@@ -922,6 +1062,37 @@ if page == "Athlètes internationaux":
         rates = rates[rates['Categorie_poids'] == selected_weight_category_taux]
     if selected_age_category_taux != 'Tous':
         rates = rates[rates['Categorie_age'] == selected_age_category_taux]
+
+    # ---- Filtre temporel ----
+    if not rates.empty:
+        min_date_taux = rates["Date_extrait"].min()
+        max_date_taux = rates["Date_extrait"].max()
+
+        if selected_period_taux == "Plage personnalisée":
+            col_start_tx, col_end_tx, _ = st.columns(3)
+            with col_start_tx:
+                custom_start_taux = st.date_input(
+                    "Date début",
+                    value=min_date_taux.date(),
+                    min_value=min_date_taux.date(),
+                    max_value=max_date_taux.date(),
+                    key="start_taux"
+                )
+            with col_end_tx:
+                custom_end_taux = st.date_input(
+                    "Date fin",
+                    value=max_date_taux.date(),
+                    min_value=min_date_taux.date(),
+                    max_value=max_date_taux.date(),
+                    key="end_taux"
+                )
+            rates = rates[
+                (rates["Date_extrait"] >= pd.Timestamp(custom_start_taux))
+                & (rates["Date_extrait"] <= pd.Timestamp(custom_end_taux))
+            ]
+        else:
+            start_date_taux = compute_start_date(selected_period_taux, max_date_taux, min_date_taux)
+            rates = rates[rates["Date_extrait"] >= start_date_taux]
 
     taux_fig = None
     if rates.empty:
@@ -1045,19 +1216,65 @@ if page == "Athlètes internationaux":
     # ======================================================
     # TOP 5 charges
     # ======================================================
+    # ======================================================
+    # TOP 5 charges
+    # ======================================================
     st.subheader("Taux de réussite pour les 5 meilleures charges")
 
-    col_f1, col_f2 = st.columns(2)
+    col_f1, col_f2, col_f3 = st.columns(3)
     with col_f1:
-        age_filter = st.selectbox("Catégorie d'âge", ["Toutes"] + sorted(df_athlete["Categorie_age"].dropna().astype(str).unique()))
+        age_filter = st.selectbox("Catégorie d'âge", ["Toutes"] + sorted(df_athlete["Categorie_age"].dropna().astype(str).unique()), key="age_top5")
     with col_f2:
-        weight_filter = st.selectbox("Catégorie de poids", ["Toutes"] + sorted(df_athlete["Categorie_poids"].dropna().astype(str).unique()))
+        weight_filter = st.selectbox("Catégorie de poids", ["Toutes"] + sorted(df_athlete["Categorie_poids"].dropna().astype(str).unique()), key="weight_top5")
+    with col_f3:
+        period_options_top5 = [
+            "Auto",
+            "6 derniers mois",
+            "1 an",
+            "2 ans",
+            "3 ans",
+            "5 ans",
+            "Plage personnalisée",
+            "Tout"
+        ]
+        selected_period_top5 = st.selectbox("Choisir une période", period_options_top5, key="period_top5")
 
     df_filtered = df_athlete.copy()
     if age_filter != "Toutes":
         df_filtered = df_filtered[df_filtered["Categorie_age"] == age_filter]
     if weight_filter != "Toutes":
         df_filtered = df_filtered[df_filtered["Categorie_poids"] == weight_filter]
+
+    # ---- Filtre temporel ----
+    if not df_filtered.empty:
+        min_date_top5 = df_filtered["Date_extrait"].min()
+        max_date_top5 = df_filtered["Date_extrait"].max()
+
+        if selected_period_top5 == "Plage personnalisée":
+            col_start_top5, col_end_top5, _ = st.columns(3)
+            with col_start_top5:
+                custom_start_top5 = st.date_input(
+                    "Date début",
+                    value=min_date_top5.date(),
+                    min_value=min_date_top5.date(),
+                    max_value=max_date_top5.date(),
+                    key="start_top5"
+                )
+            with col_end_top5:
+                custom_end_top5 = st.date_input(
+                    "Date fin",
+                    value=max_date_top5.date(),
+                    min_value=min_date_top5.date(),
+                    max_value=max_date_top5.date(),
+                    key="end_top5"
+                )
+            df_filtered = df_filtered[
+                (df_filtered["Date_extrait"] >= pd.Timestamp(custom_start_top5))
+                & (df_filtered["Date_extrait"] <= pd.Timestamp(custom_end_top5))
+            ]
+        else:
+            start_date_top5 = compute_start_date(selected_period_top5, max_date_top5, min_date_top5)
+            df_filtered = df_filtered[df_filtered["Date_extrait"] >= start_date_top5]
 
     def topN_weights_success_counts(dfX, lift_cols, lift_cols_raw, N=5):
         all_weights = []
@@ -1112,18 +1329,72 @@ if page == "Athlètes internationaux":
         "Réussites 5": [snatch_counts[4], cj_counts[4]],
     })
     st.dataframe(top5_table, use_container_width=True)
-
     # ======================================================
     # Taux de réussite par essai
     # ======================================================
-    st.subheader("Taux de réussite par essai (2 dernières années)")
-    last_date = df_athlete["Date_extrait"].max()
-    two_years_ago = last_date - pd.DateOffset(years=2) if pd.notna(last_date) else pd.NaT
-    df_2y_ready = df_athlete[df_athlete["Date_extrait"] >= two_years_ago].copy() if pd.notna(two_years_ago) else df_athlete.copy()
+    # ======================================================
+    # Taux de réussite par essai
+    # ======================================================
+    st.subheader("Taux de réussite par essai")
+
+    col_att1, col_att2, col_att3 = st.columns(3)
+    with col_att1:
+        weight_filter_att = st.selectbox("Catégorie de poids", ["Toutes"] + sorted(df_athlete["Categorie_poids"].dropna().astype(str).unique()), key="weight_att")
+    with col_att2:
+        age_filter_att = st.selectbox("Catégorie d'âge", ["Toutes"] + sorted(df_athlete["Categorie_age"].dropna().astype(str).unique()), key="age_att")
+    with col_att3:
+        period_options_att = [
+            "Auto",
+            "6 derniers mois",
+            "1 an",
+            "2 ans",
+            "3 ans",
+            "5 ans",
+            "Plage personnalisée",
+            "Tout"
+        ]
+        selected_period_att = st.selectbox("Choisir une période", period_options_att, key="period_att")
+
+    df_2y_ready = df_athlete.copy()
+    if weight_filter_att != "Toutes":
+        df_2y_ready = df_2y_ready[df_2y_ready["Categorie_poids"] == weight_filter_att]
+    if age_filter_att != "Toutes":
+        df_2y_ready = df_2y_ready[df_2y_ready["Categorie_age"] == age_filter_att]
+
+    # ---- Filtre temporel ----
+    if not df_2y_ready.empty:
+        min_date_att = df_2y_ready["Date_extrait"].min()
+        max_date_att = df_2y_ready["Date_extrait"].max()
+
+        if selected_period_att == "Plage personnalisée":
+            col_start_att, col_end_att, _ = st.columns(3)
+            with col_start_att:
+                custom_start_att = st.date_input(
+                    "Date début",
+                    value=min_date_att.date(),
+                    min_value=min_date_att.date(),
+                    max_value=max_date_att.date(),
+                    key="start_att"
+                )
+            with col_end_att:
+                custom_end_att = st.date_input(
+                    "Date fin",
+                    value=max_date_att.date(),
+                    min_value=min_date_att.date(),
+                    max_value=max_date_att.date(),
+                    key="end_att"
+                )
+            df_2y_ready = df_2y_ready[
+                (df_2y_ready["Date_extrait"] >= pd.Timestamp(custom_start_att))
+                & (df_2y_ready["Date_extrait"] <= pd.Timestamp(custom_end_att))
+            ]
+        else:
+            start_date_att = compute_start_date(selected_period_att, max_date_att, min_date_att)
+            df_2y_ready = df_2y_ready[df_2y_ready["Date_extrait"] >= start_date_att]
 
     attempt_table = None
     if df_2y_ready.empty:
-        st.info("Aucune donnée disponible sur les 2 dernières années.")
+        st.info("Aucune donnée disponible pour ces filtres.")
     else:
         def success_by_attempt(dfX, cols, cols_raw):
             out = []
@@ -1156,7 +1427,65 @@ if page == "Athlètes internationaux":
     # ======================================================
     # Bulles (0/3) par charge
     # ======================================================
+    # ======================================================
+    # Bulles (0/3) par charge
+    # ======================================================
     st.header("Analyse des bulles (0/3) par charge")
+
+    col_bu1, col_bu2, col_bu3 = st.columns(3)
+    with col_bu1:
+        weight_filter_bu = st.selectbox("Catégorie de poids", ["Toutes"] + sorted(df_athlete_all["Categorie_poids"].dropna().astype(str).unique()), key="weight_bu")
+    with col_bu2:
+        age_filter_bu = st.selectbox("Catégorie d'âge", ["Toutes"] + sorted(df_athlete_all["Categorie_age"].dropna().astype(str).unique()), key="age_bu")
+    with col_bu3:
+        period_options_bu = [
+            "Auto",
+            "6 derniers mois",
+            "1 an",
+            "2 ans",
+            "3 ans",
+            "5 ans",
+            "Plage personnalisée",
+            "Tout"
+        ]
+        selected_period_bu = st.selectbox("Choisir une période", period_options_bu, key="period_bu")
+
+    df_bulles_src = df_athlete_all.copy()
+    if weight_filter_bu != "Toutes":
+        df_bulles_src = df_bulles_src[df_bulles_src["Categorie_poids"] == weight_filter_bu]
+    if age_filter_bu != "Toutes":
+        df_bulles_src = df_bulles_src[df_bulles_src["Categorie_age"] == age_filter_bu]
+
+    # ---- Filtre temporel ----
+    if not df_bulles_src.empty:
+        min_date_bu = df_bulles_src["Date_extrait"].min()
+        max_date_bu = df_bulles_src["Date_extrait"].max()
+
+        if selected_period_bu == "Plage personnalisée":
+            col_start_bu, col_end_bu, _ = st.columns(3)
+            with col_start_bu:
+                custom_start_bu = st.date_input(
+                    "Date début",
+                    value=min_date_bu.date(),
+                    min_value=min_date_bu.date(),
+                    max_value=max_date_bu.date(),
+                    key="start_bu"
+                )
+            with col_end_bu:
+                custom_end_bu = st.date_input(
+                    "Date fin",
+                    value=max_date_bu.date(),
+                    min_value=min_date_bu.date(),
+                    max_value=max_date_bu.date(),
+                    key="end_bu"
+                )
+            df_bulles_src = df_bulles_src[
+                (df_bulles_src["Date_extrait"] >= pd.Timestamp(custom_start_bu))
+                & (df_bulles_src["Date_extrait"] <= pd.Timestamp(custom_end_bu))
+            ]
+        else:
+            start_date_bu = compute_start_date(selected_period_bu, max_date_bu, min_date_bu)
+            df_bulles_src = df_bulles_src[df_bulles_src["Date_extrait"] >= start_date_bu]
 
     def is_miss(x):
         if pd.isna(x):
@@ -1172,61 +1501,29 @@ if page == "Athlètes internationaux":
             return np.nan
 
     def compute_bulles(dfX, cols_raw, lift_name):
-
         results = []
-
         for _, row in dfX.iterrows():
-
-            # récupérer les essais
             raws = [row[c] for c in cols_raw if c in dfX.columns]
-
-            # garder uniquement les essais existants
             raws = [r for r in raws if not pd.isna(r)]
-
-            # condition bulle : 3 essais ratés
             if len(raws) > 0 and all(is_miss(r) for r in raws):
-
-                weights = [
-                    extract_weight_raw(r)
-                    for r in raws
-                ]
-
-                # PREMIÈRE charge ratée (pas min)
+                weights = [extract_weight_raw(r) for r in raws]
                 charge_bulle = weights[0]
-
-                # récupérer infos ligne
                 date_value = row.get("Date_extrait", None)
                 competition_value = row.get("Competition", None)
-
                 results.append({
                     "Date": date_value,
                     "Compétition": competition_value,
                     "Mouvement": lift_name,
                     "Charge": charge_bulle
                 })
-
         if len(results) == 0:
-            return pd.DataFrame(
-                columns=[
-                    "Date",
-                    "Compétition",
-                    "Mouvement",
-                    "Charge"
-                ]
-            )
-
+            return pd.DataFrame(columns=["Date", "Compétition", "Mouvement", "Charge"])
         df_res = pd.DataFrame(results)
-
-        # tri chronologique décroissant
-        df_res = df_res.sort_values(
-            by="Date",
-            ascending=False
-        )
-
+        df_res = df_res.sort_values(by="Date", ascending=False)
         return df_res
 
-    bulles_snatch = compute_bulles(df_athlete_all, ['1_raw','2_raw','3_raw'], "Arraché")
-    bulles_cj = compute_bulles(df_athlete_all, ['1.1_raw','2.1_raw','3.1_raw'], "Épaulé-jeté")
+    bulles_snatch = compute_bulles(df_bulles_src, ['1_raw','2_raw','3_raw'], "Arraché")
+    bulles_cj = compute_bulles(df_bulles_src, ['1.1_raw','2.1_raw','3.1_raw'], "Épaulé-jeté")
     df_bulles = pd.concat([bulles_snatch, bulles_cj], ignore_index=True)
 
     if df_bulles.empty:
@@ -1238,34 +1535,65 @@ if page == "Athlètes internationaux":
     # ======================================================
     # Récap multi-athlètes
     # ======================================================
+    # ======================================================
+    # Récap multi-athlètes
+    # ======================================================
+    # ======================================================
+    # Récap multi-athlètes
+    # ======================================================
     st.subheader("Comparaison entre athlètes, par plateau")
     athletes_norm = sorted(df_ready['Athlete_norm'].dropna().unique())
     athlete_map = dict(zip(df_ready['Athlete_norm'], df_ready['Athlete']))
 
+    # ---- Ligne 1 : sélection athlètes ----
     selected_athletes_norm = st.multiselect(
-        "Sélectionnez des athlètes",
+        "Athlètes",
         athletes_norm,
-        default=[selected_athlete_norm]
+        default=[selected_athlete_norm],
+        key="athletes_summary"
     )
     selected_athletes = [athlete_map[a] for a in selected_athletes_norm]
 
-    summary_df = pd.DataFrame()
-    
-    poids_categories_summary = sorted(
-        df_ready[df_ready['Athlete_norm'].isin(selected_athletes_norm)]['Categorie_poids'].dropna().astype(str).unique()
-    )
-    selected_weight_summary = st.multiselect(
-        "Catégorie(s) de poids",
-        poids_categories_summary,
-        default=poids_categories_summary
-    )
+    # ---- Ligne 2 : autres filtres ----
+    col_su1, col_su2, col_su3, col_su4 = st.columns(4)
+    with col_su1:
+        poids_categories_summary = sorted(
+            df_ready[df_ready['Athlete_norm'].isin(selected_athletes_norm)]['Categorie_poids'].dropna().astype(str).unique()
+        )
+        selected_weight_summary = st.multiselect(
+            "Catégorie(s) de poids",
+            poids_categories_summary,
+            default=poids_categories_summary,
+            key="weight_summary"
+        )
+    with col_su2:
+        sources_summary_available = sorted(df_ready["source"].dropna().unique())
+        selected_sources_summary = st.multiselect(
+            "Source",
+            sources_summary_available,
+            default=sources_summary_available,
+            key="source_summary"
+        )
+    with col_su3:
+        age_filter_su = st.selectbox(
+            "Catégorie d'âge",
+            ["Toutes"] + sorted(df_ready['Categorie_age'].dropna().astype(str).unique()),
+            key="age_summary"
+        )
+    with col_su4:
+        period_options_su = [
+            "Auto",
+            "6 derniers mois",
+            "1 an",
+            "2 ans",
+            "3 ans",
+            "5 ans",
+            "Plage personnalisée",
+            "Tout"
+        ]
+        selected_period_su = st.selectbox("Période", period_options_su, key="period_summary")
 
-    sources_summary_available = sorted(df_ready["source"].dropna().unique())
-    selected_sources_summary = st.multiselect(
-        "Source pour le tableau récapitulatif",
-        sources_summary_available,
-        default=sources_summary_available
-    )
+    summary_df = pd.DataFrame()
 
     if selected_athletes:
         summary_list = []
@@ -1276,10 +1604,20 @@ if page == "Athlètes internationaux":
                 (df_ready['Categorie_poids'].isin(selected_weight_summary) if selected_weight_summary else True)
             ].copy()
 
+            if age_filter_su != "Toutes":
+                df_a = df_a[df_a["Categorie_age"] == age_filter_su]
+
+            if not df_a.empty:
+                min_date_su = df_a["Date_extrait"].min()
+                max_date_su = df_a["Date_extrait"].max()
+
+                if selected_period_su != "Plage personnalisée":
+                    start_date_su = compute_start_date(selected_period_su, max_date_su, min_date_su)
+                    df_a = df_a[df_a["Date_extrait"] >= start_date_su]
+
             if not df_a.empty:
                 best_snatch = df_a['Snatch'].max()
                 best_cj = df_a['Clean_Jerk'].max()
-
                 if df_a['Total'].notna().any():
                     best_total = df_a['Total'].max()
                     row_best_total = df_a[df_a['Total'] == best_total].sort_values(by='Date_extrait').iloc[-1]
@@ -1307,6 +1645,69 @@ if page == "Athlètes internationaux":
                     "P.C. au meilleur total": bodyweight_best_total,
                 })
 
+        # ---- Plage personnalisée (hors boucle) ----
+        if selected_period_su == "Plage personnalisée":
+            df_ref = df_ready[df_ready['Athlete_norm'] == normalize_string(selected_athletes[0])]
+            if not df_ref.empty:
+                min_date_su_ref = df_ref["Date_extrait"].min()
+                max_date_su_ref = df_ref["Date_extrait"].max()
+                col_start_su, col_end_su, _, _ = st.columns(4)
+                with col_start_su:
+                    custom_start_su = st.date_input(
+                        "Date début",
+                        value=min_date_su_ref.date(),
+                        min_value=min_date_su_ref.date(),
+                        max_value=max_date_su_ref.date(),
+                        key="start_summary"
+                    )
+                with col_end_su:
+                    custom_end_su = st.date_input(
+                        "Date fin",
+                        value=max_date_su_ref.date(),
+                        min_value=min_date_su_ref.date(),
+                        max_value=max_date_su_ref.date(),
+                        key="end_summary"
+                    )
+                summary_list = []
+                for athlete in selected_athletes:
+                    df_a = df_ready[
+                        (df_ready['Athlete_norm'] == normalize_string(athlete)) &
+                        (df_ready['source'].isin(selected_sources_summary)) &
+                        (df_ready['Categorie_poids'].isin(selected_weight_summary) if selected_weight_summary else True)
+                    ].copy()
+                    if age_filter_su != "Toutes":
+                        df_a = df_a[df_a["Categorie_age"] == age_filter_su]
+                    df_a = df_a[
+                        (df_a["Date_extrait"] >= pd.Timestamp(custom_start_su))
+                        & (df_a["Date_extrait"] <= pd.Timestamp(custom_end_su))
+                    ]
+                    if not df_a.empty:
+                        best_snatch = df_a['Snatch'].max()
+                        best_cj = df_a['Clean_Jerk'].max()
+                        if df_a['Total'].notna().any():
+                            best_total = df_a['Total'].max()
+                            row_best_total = df_a[df_a['Total'] == best_total].sort_values(by='Date_extrait').iloc[-1]
+                            bodyweight_best_total = row_best_total.get('P.C.', np.nan)
+                        else:
+                            best_total = np.nan
+                            bodyweight_best_total = np.nan
+                        def first_success(series):
+                            vals = series.dropna().values
+                            return vals[0] if len(vals) > 0 else np.nan
+                        snatch_starts = df_a[['1','2','3']].apply(first_success, axis=1)
+                        best_start_snatch = snatch_starts.dropna().max()
+                        cj_starts = df_a[['1.1','2.1','3.1']].apply(first_success, axis=1)
+                        best_start_cj = cj_starts.dropna().max()
+                        summary_list.append({
+                            "Athlète": athlete,
+                            "Meilleur total": best_total,
+                            "Meilleur arraché": best_snatch,
+                            "Meilleur épaulé-jeté": best_cj,
+                            "Meilleure barre départ arraché": best_start_snatch,
+                            "Meilleure barre départ épaulé-jeté": best_start_cj,
+                            "P.C. au meilleur total": bodyweight_best_total,
+                        })
+
         summary_df = pd.DataFrame(summary_list)
 
         if not summary_df.empty:
@@ -1324,7 +1725,6 @@ if page == "Athlètes internationaux":
             )
         else:
             st.info("Aucune donnée pour les filtres sélectionnés.")
-
     # ======================================================
     # EXPORTS — tout en bas
     # ======================================================
@@ -1344,7 +1744,8 @@ if page == "Athlètes internationaux":
     st.write("")
 
     # ── Bouton 2 : rapport global complet ──────────────────
-    if st.button("📄 Générer le rapport HTML global"):
+    # ── Bouton 2 : rapport global complet ──────────────────
+    if generate_report_clicked:
 
         taux_ar_m, taux_epj_m, taux_total_m = compute_avg_rates(df_athlete)
 
@@ -1400,7 +1801,7 @@ if page == "Athlètes internationaux":
             summary_html         = summary_to_html(summary_df) if not summary_df.empty else "<p>Aucune donnée.</p>",
         )
 
-        st.download_button(
+        st.sidebar.download_button(
             "⬇️ Télécharger le rapport HTML global",
             data=html,
             file_name=f"rapport_{selected_athlete.replace(' ', '_')}.html",
