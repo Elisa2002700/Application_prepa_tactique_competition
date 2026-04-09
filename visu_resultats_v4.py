@@ -470,6 +470,14 @@ generate_report_clicked = st.sidebar.button("📄 Générer le rapport HTML glob
 if page == "Athlètes internationaux":
     st.title("Évolution des Performances")
 
+    st.info(
+        "Les données contiennent les résultats de scoresheet (depuis 2021), "
+        "et de l'IWF (depuis 1998).\n\n"
+        "Les données relatives aux Europes U23 ont ponctuellement été ajoutées manuellement.\n\n"
+        "La période de données automatiquement sélectionnée est de 2 ans.\n"
+        "Pour la changer, choisir une période différente."
+    )
+
     athletes_norm = sorted(df_ready['Athlete_norm'].dropna().unique())
     athlete_map = dict(zip(df_ready['Athlete_norm'], df_ready['Athlete']))
 
