@@ -1559,7 +1559,7 @@ if page == "Athlètes internationaux":
             athlete_poids = df_a['Categorie_poids'].dropna().astype(str).unique().tolist()
             poids_to_use = [p for p in selected_weight_summary if p in athlete_poids]
             if not poids_to_use:
-                poids_to_use = athlete_poids
+                continue
             if poids_to_use:
                 df_a = df_a[df_a['Categorie_poids'].isin(poids_to_use)]
 
