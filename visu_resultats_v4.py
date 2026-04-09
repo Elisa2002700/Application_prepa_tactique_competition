@@ -372,7 +372,9 @@ df["Year"] = df["Date_extrait"].dt.year
 # Âge
 # ---------------------------
 df["AN"] = pd.to_numeric(df.get("AN", np.nan), errors="coerce")
-df["Age"] = df["Year"] - df["AN"]
+from datetime import datetime
+year_now = datetime.now().year
+df["Age"] = year_now - df["AN"]
 
 # ---------------------------
 # Sexe + catégories
