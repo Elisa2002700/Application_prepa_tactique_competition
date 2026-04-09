@@ -1475,10 +1475,15 @@ if page == "Athlètes internationaux":
     athlete_map = dict(zip(df_ready['Athlete_norm'], df_ready['Athlete']))
 
     # ── Calcul des options AVANT les widgets ──────────────
-    athletes_for_filter = (
-        st.session_state.get("athletes_summary", [selected_athlete_norm])
-        or [selected_athlete_norm]
-    )
+    # Toujours initialiser le résumé avec l'athlète sélectionné
+    if "athletes_summary" not in st.session_state:
+        st.session_state["athletes_summary"] = [selected_athlete_norm]
+    
+    # Si l'utilisateur sélectionne un nouvel athlète dans la page principale :
+    if selected_athlete_norm not in st.session_state["athletes_summary"]:
+        st.session_state["athletes_summary"] = [selected_athlete_norm]
+    
+    athletes_for_filter = st.session_state["athletes_summary"]
     all_poids_for_selected = sorted(
         df_ready[df_ready['Athlete_norm'].isin(athletes_for_filter)]['Categorie_poids']
         .dropna().astype(str).unique()
@@ -1497,10 +1502,17 @@ if page == "Athlètes internationaux":
         st.session_state["_last_athletes_key_summary"] = current_athletes_key
 
     # ── Widgets ───────────────────────────────────────────
+    # Toujours initialiser le résumé avec l'athlète sélectionné
+    if "athletes_summary" not in st.session_state:
+        st.session_state["athletes_summary"] = [selected_athlete_norm]
+    
+    # Si l'utilisateur change d'athlète dans le menu principal
+    if selected_athlete_norm not in st.session_state["athletes_summary"]:
+        st.session_state["athletes_summary"] = [selected_athlete_norm]
+    
     selected_athletes_norm = st.multiselect(
         "Athlètes",
         athletes_norm,
-        default=[selected_athlete_norm],
         key="athletes_summary"
     )
     selected_athletes = [athlete_map[a] for a in selected_athletes_norm]
