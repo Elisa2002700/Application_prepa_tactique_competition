@@ -1384,32 +1384,88 @@ if page == "Athlètes internationaux":
         st.dataframe(attempt_table, use_container_width=True)
 
     # ======================================================
-    # Bulles (0/3) par charge
+    # Bulles (0/3) par charge — VERSION CORRIGÉE & ROBUSTE
     # ======================================================
     st.header("Analyse des bulles (0/3) par charge")
-
+    
+    import re
+    
+    # --- Détection robuste des ratés ---
+    def is_miss(x):
+        """
+        Détecte toutes les formes possibles de ratés :
+        - "-120"
+        - "- 120"
+        - "‑120" (tiret Unicode)
+        - "--120"
+        - "-120,0"
+        """
+        if pd.isna(x):
+            return False
+        s = str(x).strip().replace("‑", "-")  # normaliser les tirets
+        return bool(re.match(r"^-+\s*\d+([.,]\d+)?$", s))
+    
+    # --- Extraction robuste de charge depuis le raw ---
+    def extract_weight_raw(x):
+        """
+        Extrait proprement le poids :
+        - supprime les tirets, espaces, caractères exotiques
+        - convertit virgule -> point
+        """
+        if pd.isna(x):
+            return np.nan
+        s = str(x)
+        s = s.replace("‑", "-")  # normaliser
+        s = re.sub(r"[^0-9,.\-]", "", s)  # garder uniquement chiffres, ., , et -
+        s = s.replace(",", ".")
+        s = s.lstrip("-")  # enlever le signe moins
+        try:
+            return float(s)
+        except:
+            return np.nan
+    
+    # --- UI filters ---
     col_bu1, col_bu2, col_bu3 = st.columns(3)
+    
     with col_bu1:
-        weight_filter_bu = st.selectbox("Catégorie de poids", ["Toutes"] + sorted(df_athlete_all["Categorie_poids"].dropna().astype(str).unique()), key="weight_bu")
+        weight_filter_bu = st.selectbox(
+            "Catégorie de poids",
+            ["Toutes"] + sorted(df_athlete_all["Categorie_poids"].dropna().astype(str).unique()),
+            key="weight_bu"
+        )
+    
     with col_bu2:
-        age_filter_bu = st.selectbox("Catégorie d'âge", ["Toutes"] + sorted(df_athlete_all["Categorie_age"].dropna().astype(str).unique()), key="age_bu")
+        age_filter_bu = st.selectbox(
+            "Catégorie d'âge",
+            ["Toutes"] + sorted(df_athlete_all["Categorie_age"].dropna().astype(str).unique()),
+            key="age_bu"
+        )
+    
     with col_bu3:
         period_options_bu = [
             "Auto", "6 derniers mois", "1 an", "2 ans",
             "3 ans", "5 ans", "Plage personnalisée", "Tout"
         ]
-        selected_period_bu = st.selectbox("Choisir une période", period_options_bu, key="period_bu")
-
+        selected_period_bu = st.selectbox(
+            "Choisir une période",
+            period_options_bu,
+            key="period_bu"
+        )
+    
+    # --- filtre source ---
     df_bulles_src = df_athlete_all.copy()
+    
     if weight_filter_bu != "Toutes":
         df_bulles_src = df_bulles_src[df_bulles_src["Categorie_poids"] == weight_filter_bu]
+    
     if age_filter_bu != "Toutes":
         df_bulles_src = df_bulles_src[df_bulles_src["Categorie_age"] == age_filter_bu]
-
+    
+    # --- filtre temporel ---
     if not df_bulles_src.empty:
         min_date_bu = df_bulles_src["Date_extrait"].min()
         max_date_bu = df_bulles_src["Date_extrait"].max()
-
+    
         if selected_period_bu == "Plage personnalisée":
             col_start_bu, col_end_bu, _ = st.columns(3)
             with col_start_bu:
@@ -1425,56 +1481,51 @@ if page == "Athlètes internationaux":
                     key="end_bu"
                 )
             df_bulles_src = df_bulles_src[
-                (df_bulles_src["Date_extrait"] >= pd.Timestamp(custom_start_bu))
-                & (df_bulles_src["Date_extrait"] <= pd.Timestamp(custom_end_bu))
+                (df_bulles_src["Date_extrait"] >= pd.Timestamp(custom_start_bu)) &
+                (df_bulles_src["Date_extrait"] <= pd.Timestamp(custom_end_bu))
             ]
         else:
             start_date_bu = compute_start_date(selected_period_bu, max_date_bu, min_date_bu)
             df_bulles_src = df_bulles_src[df_bulles_src["Date_extrait"] >= start_date_bu]
-
-    def is_miss(x):
-        if pd.isna(x):
-            return False
-        return str(x).strip().startswith("-")
-
-    def extract_weight_raw(x):
-        try:
-            if pd.isna(x):
-                return np.nan
-            return float(str(x).replace("-", "").replace(",", ".").strip())
-        except:
-            return np.nan
-
+    
+    # --- calcul bulles ---
     def compute_bulles(dfX, cols_raw, lift_name):
         results = []
         for _, row in dfX.iterrows():
             raws = [row[c] for c in cols_raw if c in dfX.columns]
+    
+            # garder uniquement valeurs non-vides
             raws = [r for r in raws if not pd.isna(r)]
-            if len(raws) > 0 and all(is_miss(r) for r in raws):
-                weights = [extract_weight_raw(r) for r in raws]
-                charge_bulle = weights[0]
-                date_value = row.get("Date_extrait", None)
-                competition_value = row.get("Competition", None)
+    
+            # si aucun essai renseigné : skip
+            if len(raws) == 0:
+                continue
+    
+            # détecter bulle : tous les essais ratés
+            if all(is_miss(r) for r in raws):
+                charge_bulle = extract_weight_raw(raws[0])
                 results.append({
-                    "Date": date_value,
-                    "Compétition": competition_value,
+                    "Date": row.get("Date_extrait", None),
+                    "Compétition": row.get("Competition", None),
                     "Mouvement": lift_name,
                     "Charge": charge_bulle
                 })
+    
         if len(results) == 0:
             return pd.DataFrame(columns=["Date", "Compétition", "Mouvement", "Charge"])
+    
         df_res = pd.DataFrame(results)
-        df_res = df_res.sort_values(by="Date", ascending=False)
-        return df_res
-
+        return df_res.sort_values(by="Date", ascending=False)
+    
     bulles_snatch = compute_bulles(df_bulles_src, ['1_raw','2_raw','3_raw'], "Arraché")
-    bulles_cj = compute_bulles(df_bulles_src, ['1.1_raw','2.1_raw','3.1_raw'], "Épaulé-jeté")
+    bulles_cj     = compute_bulles(df_bulles_src, ['1.1_raw','2.1_raw','3.1_raw'], "Épaulé-jeté")
+    
     df_bulles = pd.concat([bulles_snatch, bulles_cj], ignore_index=True)
-
+    
     if df_bulles.empty:
         st.info("Aucune bulle détectée.")
     else:
-        df_bulles["Date"] = df_bulles["Date"].dt.strftime("%Y-%m-%d")
+        df_bulles["Date"] = pd.to_datetime(df_bulles["Date"]).dt.strftime("%Y-%m-%d")
         st.dataframe(df_bulles, use_container_width=True)
 
     # ======================================================
