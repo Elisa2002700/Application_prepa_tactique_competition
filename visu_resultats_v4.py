@@ -208,11 +208,6 @@ tr:nth-child(even) {{ background-color: #fafafa; }}
 </div>
 
 <div class="section">
-<h2>Évolution des taux de réussite</h2>
-{fig_taux_html}
-</div>
-
-<div class="section">
 <h2>Taux de réussite pour les 5 meilleures charges</h2>
 {top5_html}
 </div>
@@ -225,11 +220,6 @@ tr:nth-child(even) {{ background-color: #fafafa; }}
 <div class="section">
 <h2>Analyse des bulles (0/3) par charge</h2>
 {bulles_html}
-</div>
-
-<div class="section">
-<h2>Comparaison entre athlètes, par plateau</h2>
-{summary_html}
 </div>
 
 </body>
